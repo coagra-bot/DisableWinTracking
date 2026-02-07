@@ -82,7 +82,7 @@ class ConsoleDialog(wx.Dialog):
 
     def submit_issue(self, event):
         webbrowser.open_new_tab(
-            "https://github.com/bitlog2/DisableWinTracking/issues/new"
+            "https://github.com/Potencial/DisableWinTracking/issues/new"
         )
 
 
@@ -351,7 +351,7 @@ class MainPanel(wx.Panel):
         if self.diagtrack_check.IsChecked():
             dwt_util.clear_diagtrack()
         if self.service_check.IsChecked():
-            if self.service_rad.GetSize():
+            if self.service_rad.GetSelection():
                 dwt_util.delete_service("dmwappushsvc")
                 dwt_util.delete_service("DiagTrack")
             else:

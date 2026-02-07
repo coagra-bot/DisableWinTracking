@@ -28,7 +28,7 @@ This program cannot run correctly from a file path that contains Cyrillic charac
 
 ## DOWNLOAD
 
-[DOWNLOAD EXE HERE](https://github.com/bitlog2/DisableWinTracking/releases/)
+[DOWNLOAD EXE HERE](https://github.com/Potencial/DisableWinTracking/releases/)
 
 **Note:** Windows Defender may report the EXE as a trojan (Win32/Pocyx.C!cl), and may therefore prevent you from extracting the EXE to anywhere on your computer. Set up an exclusion in **Settings > Update & Security > Windows Defender > Exclusions** by adding the folder you intend to extract the EXE to.
 
@@ -36,7 +36,7 @@ This program cannot run correctly from a file path that contains Cyrillic charac
 
 You can either:
 
-A. [Run the binary uploaded to the Release tab as an Administrator and select which options you'd like](https://github.com/bitlog2/DisableWinTracking/releases/)
+A. [Run the binary uploaded to the Release tab as an Administrator and select which options you'd like](https://github.com/Potencial/DisableWinTracking/releases/)
 
 B. Install Python and the dependencies listed below and run the script from an elevated command prompt and select which options you'd like  
 
@@ -47,11 +47,40 @@ Either can be run with the -silent argument as of v3.1. This will perform all av
 **You still need to run it as administrator.**
 
 ## Dependencies
-This is only to run the script from source, [download the exe here](https://github.com/bitlog2/DisableWinTracking/releases/)
-* Tested on Python 3.7.2 since DisableWinTracking 3.2.4 (commit [9f1d2aa](https://github.com/bitlog2/DisableWinTracking/commit/9f1d2aa58cec76306c3dc6887e7c9c92769936fe))
-* [wxPython](http://wxpython.org/download.php)
-* [PyWin32](http://sourceforge.net/projects/pywin32/files/pywin32/)
-* Windows 10 (Duh)
+This is only to run the script from source, [download the exe here](https://github.com/Potencial/DisableWinTracking/releases/).
+
+Supported Python versions:
+* Python 3.12
+* Python 3.14
+
+Install runtime dependencies:
+
+```powershell
+py -3.14 -m pip install -r requirements.lock.py314.txt
+```
+
+Or use the editable base requirements:
+
+```powershell
+py -3.14 -m pip install -r requirements.txt
+```
+
+Build dependencies are split into `requirements.build.txt`.
+
+## Windows smoke validation
+
+Run the non-destructive runtime checks and unit tests:
+
+```powershell
+./scripts/windows_smoke.ps1 -PythonVersion 3.14
+```
+
+From WSL, run against Windows Python:
+
+```bash
+/mnt/c/Windows/py.exe -3.14 -m pip install -r requirements.lock.py314.txt
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows_smoke.ps1 -PythonVersion 3.14
+```
 
 ## Methods Used
 
@@ -120,7 +149,7 @@ This fork changes a few things from the original [DisableWinTracking](https://gi
  0.0.0.0 msftncsi.com<br>
  0.0.0.0 www.msftncsi.com<br>
  If your Windows 10 NCSI is broken, we recommend you edit C:\Windows\System32\drivers\etc\hosts and remove any lines containing the text "msftncsi", then save the file. That should fix the issue for you.
-- Upgraded from Python 2.7 to 3.9
+- Upgraded from Python 2.7 to Python 3.12-3.14 runtime validation support
 
 ## License
 

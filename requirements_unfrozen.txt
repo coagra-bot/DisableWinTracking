@@ -1,3 +1,1 @@
-pypiwin32
-six
-wxpython
+-r requirements.txt

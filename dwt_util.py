@@ -16,8 +16,6 @@
 # along with DisableWinTracking.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 import os
-import platform
-from collections import OrderedDict
 import pywintypes
 import shutil
 import subprocess
@@ -74,39 +72,59 @@ def is_64bit():
         )
         os._exit(0)
 
-    if os.environ["PROCESSOR_ARCHITECTURE"] == "AMD64" or os.environ["PROCESSOR_ARCHITEW6432"] == "AMD64":
+    if (
+        os.environ.get("PROCESSOR_ARCHITECTURE") == "AMD64"
+        or os.environ.get("PROCESSOR_ARCHITEW6432") == "AMD64"
+    ):
         return True
 
     return False
 
 
+def _decode_output(data):
+    if not data:
+        return ""
+
+    return data.decode("utf-8", "replace").strip()
+
+
 def ip_block(ip_list, undo):
     for ip in ip_list:
-        cmd = 'netsh advfirewall firewall {act} rule name="TrackingIP-{ip}"'.format(
-            act="delete" if undo else "add", ip=ip
-        )
+        cmd = [
+            "netsh",
+            "advfirewall",
+            "firewall",
+            "delete" if undo else "add",
+            "rule",
+            "name=TrackingIP-{ip}".format(ip=ip),
+        ]
         if not undo:
-            cmd += (
-                ' dir=out protocol=any remoteip="{ip}" profile=any action=block'.format(
-                    ip=ip
-                )
-            )
+            cmd += [
+                "dir=out",
+                "protocol=any",
+                "remoteip={ip}".format(ip=ip),
+                "profile=any",
+                "action=block",
+            ]
 
-        try:
-            subprocess_handler(shlex.split(cmd))
+        return_code, stdout, stderr = subprocess_handler(cmd)
+        if return_code == 0:
             logger.info(
                 "IP Blocker: The IP {ip} was successfully {act}.".format(
                     ip=ip, act="unblocked" if undo else "blocked"
                 )
             )
-        except CalledProcessError as e:
+        else:
             logger.exception(
                 "IP Blocker: Failed to {act} IP {ip}".format(
                     act="unblock" if undo else "block", ip=ip
                 )
             )
+            output = _decode_output(stderr) or _decode_output(stdout)
             logger.critical(
-                "IP Blocker: Error output:\n" + e.stdout.decode("ascii", "replace")
+                "IP Blocker: Error code {code}. Output: {output}".format(
+                    code=return_code, output=output
+                )
             )
 
 
@@ -120,8 +138,7 @@ def clear_diagtrack():
 
     cmds = [
         "sc delete DiagTrack",
-        "sc delete dmwappushservice",
-        'echo "" > "{file}"'.format(file=file),
+        "sc delete dmwappushsvc",
     ]
 
     i = 0
@@ -130,9 +147,9 @@ def clear_diagtrack():
         i += 1
         service = cmd.split("sc delete ")
 
-        output = subprocess_handler(cmd)
-        if output[0] in [0, 1060, 1072]:
-            if output[0] == 0:
+        return_code, stdout, stderr = subprocess_handler(cmd)
+        if return_code in [0, 1060, 1072]:
+            if return_code == 0:
                 if len(service) > 1:
                     logger.info(
                         "DiagTrack: Successfully deleted service '{0}'".format(
@@ -141,13 +158,13 @@ def clear_diagtrack():
                     )
                 else:
                     logger.info("DiagTrack: Successfully erased tracking log.")
-            if output[0] == 1060:
+            if return_code == 1060:
                 logger.info(
                     "DiagTrack: {0} service doesn't exist. This is OK, you likely removed it already.".format(
                         service[1]
                     )
                 )
-            if output[0] == 1072:
+            if return_code == 1072:
                 logger.info(
                     "DiagTrack: {0} service marked for deletion. This is OK, make sure you reboot your machine!".format(
                         service[1]
@@ -156,12 +173,23 @@ def clear_diagtrack():
 
             logger.info("DiagTrack: Completed Part {0}/{1}".format(i, len(cmds)))
         else:
-            logger.info("{0}".format(output[0]))
+            logger.info("{0}".format(return_code))
             failed = True
             logger.exception("DiagTrack: Failed Part {0}/{1}".format(i, len(cmds)))
+            output = _decode_output(stderr) or _decode_output(stdout)
             logger.critical(
-                "DiagTrack: Error code: {0} - {1}".format(output[0], output[1])
+                "DiagTrack: Error code: {0} - {1}".format(return_code, output)
             )
+
+    i += 1
+    try:
+        with open(file, "w"):
+            pass
+        logger.info("DiagTrack: Successfully erased tracking log.")
+        logger.info("DiagTrack: Completed Part {0}/{1}".format(i, len(cmds) + 1))
+    except OSError:
+        failed = True
+        logger.exception("DiagTrack: Failed Part {0}/{1}".format(i, len(cmds) + 1))
 
     if failed:
         logger.info("DiagTrack: Complete. Errors were recorded.")
@@ -254,7 +282,7 @@ def telemetry(undo):
 
 
 def services(undo):
-    value = 4 if undo else 3
+    value = 3 if undo else 4
     service_keys = {
         "dmwappushsvc": [
             winreg.HKEY_LOCAL_MACHINE,
@@ -324,8 +352,8 @@ def wifisense(undo):
 
 
 def onedrive(undo):
-    file_sync_value = int(undo)
-    list_pin_value = int(not undo)
+    file_sync_value = 0 if undo else 1
+    list_pin_value = 1 if undo else 0
     action = "install" if undo else "uninstall"
 
     if is_64bit():
@@ -382,13 +410,14 @@ def onedrive(undo):
     if os.path.isfile(onedrive_setup):
         cmd = "{bin} /{action}".format(bin=onedrive_setup, action=action)
 
-        output = subprocess_handler(cmd)
-        if output[0] == -2147219813:
+        return_code, stdout, stderr = subprocess_handler(cmd)
+        if return_code in (0, -2147219813):
             logger.info("OneDrive: successfully {action}ed".format(action=action))
         else:
+            output = _decode_output(stderr) or _decode_output(stdout)
             logger.info(
                 "OneDrive: unable to {action}. Exited with code: {code} - {message}".format(
-                    action=action, code=output[0], message=output[1]
+                    action=action, code=return_code, message=output
                 )
             )
     else:
@@ -422,29 +451,63 @@ def set_registry(keys):
 
 def host_file(entries, undo):
     null_ip = "0.0.0.0 "
-    nulled_entires = [null_ip + x for x in entries]
+    nulled_entries = [null_ip + x for x in entries]
     hosts_path = os.path.join(os.environ["SYSTEMROOT"], "System32/drivers/etc/hosts")
+    blocked_set = set(nulled_entries)
+
+    try:
+        with open(hosts_path, "r", encoding="utf-8", errors="ignore") as hosts:
+            existing_lines = hosts.read().splitlines()
+    except OSError:
+        logger.exception("Hosts: Failed to read hosts file")
+        return False
 
     if undo:
         try:
-            with open(hosts_path, "r") as hosts, tempfile.NamedTemporaryFile(
+            with tempfile.NamedTemporaryFile(
                 mode="w+",
-                delete=False
+                delete=False,
+                encoding="utf-8",
             ) as temp:
-                for line in hosts:
-                    if not any(domain in line for domain in entries):
-                        temp.write(line)
+                removed = 0
+                for line in existing_lines:
+                    if line.strip() in blocked_set:
+                        removed += 1
+                        continue
+                    temp.write(line + "\n")
                 temp.close()
                 shutil.move(temp.name, hosts_path)
+            logger.info("Hosts: Removed {count} entries.".format(count=removed))
             return True
         except OSError:
             logger.exception("Hosts: Failed to undo hosts file")
     else:
         try:
-            with open(hosts_path, "a") as f:
-                f.write("\n" + "\n".join(nulled_entires))
+            existing_set = {line.strip() for line in existing_lines}
+            missing_entries = [
+                entry for entry in nulled_entries if entry not in existing_set
+            ]
+
+            if not missing_entries:
+                logger.info("Hosts: All entries already exist. Nothing to do.")
+                return True
+
+            with tempfile.NamedTemporaryFile(
+                mode="w+",
+                delete=False,
+                encoding="utf-8",
+            ) as temp:
+                for line in existing_lines:
+                    temp.write(line + "\n")
+                if existing_lines and existing_lines[-1].strip():
+                    temp.write("\n")
+                temp.write("\n".join(missing_entries))
+                temp.write("\n")
+                temp.close()
+                shutil.move(temp.name, hosts_path)
+            logger.info("Hosts: Added {count} entries.".format(count=len(missing_entries)))
             return True
-        except (WindowsError, IOError):
+        except OSError:
             logger.exception("Hosts: Failed to modify hosts file")
 
     return False
@@ -478,16 +541,18 @@ def app_manager(apps, undo):
 
 
 def subprocess_handler(cmd):
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd, posix=False)
+
     p = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         stdin=subprocess.PIPE,
-        shell=True,
+        shell=False,
     )
-    output = p.communicate()
-
-    return [p.returncode, output]
+    stdout, stderr = p.communicate()
+    return p.returncode, stdout, stderr
 
 
 # Old reinstall code, does not work:

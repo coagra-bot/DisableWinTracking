@@ -1,0 +1,4 @@
+packaging==25.0
+pywin32==311
+six==1.17.0
+wxPython==4.2.4
