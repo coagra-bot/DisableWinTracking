@@ -56,6 +56,13 @@ Silent mode:
 py -3.14 dwt.py -silent
 ```
 
+### Language Selection (UI)
+
+- Available languages: `English`, `Espanol`.
+- Open `File -> Settings` and choose the language in the `Language` selector.
+- Language preference is persisted for next runs.
+- After changing language, restart the app to fully refresh all visible labels.
+
 `-silent` currently applies these actions:
 
 - Clear DiagTrack log (`clear_diagtrack`)
@@ -179,6 +186,13 @@ Modo silencioso:
 ```powershell
 py -3.14 dwt.py -silent
 ```
+
+### Seleccion de idioma (UI)
+
+- Idiomas disponibles: `English`, `Espanol`.
+- Abre `Archivo -> Configuracion` y selecciona el idioma en `Idioma`.
+- La preferencia queda guardada para las siguientes ejecuciones.
+- Despues de cambiar idioma, reinicia la app para refrescar todos los textos visibles.
 
 Actualmente `-silent` aplica:
 

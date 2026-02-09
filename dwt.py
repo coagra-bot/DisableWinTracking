@@ -17,6 +17,8 @@
 import logging
 import sys
 import io
+import json
+import os
 import platform
 import traceback
 import webbrowser
@@ -32,7 +34,60 @@ from wx.lib.itemspicker import (
 )
 
 import dwt_about
+import dwt_i18n
 import dwt_util
+
+
+SETTINGS_DEFAULTS = {
+    "language": "en",
+}
+APP_SETTINGS = SETTINGS_DEFAULTS.copy()
+
+
+def settings_path():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.name == "nt":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            base_dir = os.path.join(appdata, "DisableWinTracking")
+    else:
+        base_dir = os.path.join(os.path.expanduser("~"), ".disablewintracking")
+
+    try:
+        os.makedirs(base_dir, exist_ok=True)
+    except OSError:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+
+    return os.path.join(base_dir, "settings.json")
+
+
+def load_app_settings():
+    loaded = SETTINGS_DEFAULTS.copy()
+    path = settings_path()
+
+    try:
+        with open(path, "r", encoding="utf-8") as settings_file:
+            data = json.load(settings_file)
+            if isinstance(data, dict):
+                loaded.update({k: v for k, v in data.items() if k in loaded})
+    except (OSError, IOError, ValueError):
+        pass
+
+    loaded["language"] = dwt_i18n.normalize_language(loaded.get("language"))
+    return loaded
+
+
+def save_app_settings(settings):
+    path = settings_path()
+    data = SETTINGS_DEFAULTS.copy()
+    data.update({k: v for k, v in settings.items() if k in data})
+    data["language"] = dwt_i18n.normalize_language(data.get("language"))
+
+    try:
+        with open(path, "w", encoding="utf-8") as settings_file:
+            json.dump(data, settings_file, indent=2, sort_keys=True)
+    except (OSError, IOError):
+        pass
 
 
 class RedirectText(io.StringIO):
@@ -50,10 +105,11 @@ class RedirectText(io.StringIO):
 
 class ConsoleDialog(wx.Dialog):
     def __init__(self, old_stdout):
+        tr = dwt_i18n.translate
         wx.Dialog.__init__(
             self,
             parent=wx.GetApp().TopWindow,
-            title="Console Output",
+            title=tr("console_title"),
             size=(500, 200),
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
@@ -66,7 +122,7 @@ class ConsoleDialog(wx.Dialog):
         button_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
 
         report_button = wx.FindWindowById(wx.ID_CANCEL, self)
-        report_button.SetLabel("Report an issue")
+        report_button.SetLabel(tr("report_issue"))
 
         console_sizer.Add(
             console_box, 1, wx.LEFT | wx.RIGHT | wx.EXPAND | wx.ALIGN_TOP, 5
@@ -88,9 +144,10 @@ class ConsoleDialog(wx.Dialog):
 
 class MainFrame(wx.Frame):
     def __init__(self):
+        tr = dwt_i18n.translate
         super(MainFrame, self).__init__(
             parent=wx.GetApp().GetTopWindow(),
-            title="Disable Windows 10 Tracking",
+            title=tr("app_title"),
             size=(415, 245),
         )
 
@@ -98,15 +155,19 @@ class MainFrame(wx.Frame):
         panel = MainPanel(self)
 
         file_menu = wx.Menu()
-        settings = file_menu.Append(wx.ID_SETUP, "&Settings", "DWT settings")
+        settings = file_menu.Append(
+            wx.ID_SETUP, tr("menu_settings"), tr("menu_settings_help")
+        )
 
         help_menu = wx.Menu()
-        about = help_menu.Append(wx.ID_ABOUT, "&About", "About DWT")
-        licenses = help_menu.Append(wx.ID_ANY, "&Licenses", "Open-source licenses")
+        about = help_menu.Append(wx.ID_ABOUT, tr("menu_about"), tr("menu_about_help"))
+        licenses = help_menu.Append(
+            wx.ID_ANY, tr("menu_licenses"), tr("menu_licenses_help")
+        )
 
         menu_bar = wx.MenuBar()
-        menu_bar.Append(file_menu, "&File")
-        menu_bar.Append(help_menu, "&Help")
+        menu_bar.Append(file_menu, tr("menu_file"))
+        menu_bar.Append(help_menu, tr("menu_help"))
         self.SetMenuBar(menu_bar)
 
         check_elevated()
@@ -123,86 +184,81 @@ class MainPanel(wx.Panel):
         super(MainPanel, self).__init__(parent)
 
         self.parent = parent
+        self.tr = dwt_i18n.translate
+        self.current_language = dwt_i18n.get_language()
         self.picked_normal = []
         self.picked_extra = []
         self.picked_ips = []
 
-        self.service_check = wx.CheckBox(self, label="Services")
+        self.service_check = wx.CheckBox(self, label=self.tr("services_label"))
         self.service_check.SetToolTip(
-            "Disables or deletes tracking services. Choose option in 'Services Method'"
+            self.tr("services_tooltip")
         )
 
-        self.diagtrack_check = wx.CheckBox(self, label="Clear DiagTrack log")
+        self.diagtrack_check = wx.CheckBox(self, label=self.tr("diagtrack_label"))
         self.diagtrack_check.SetToolTip(
-            "Clears Dianostic Tracking log and prevents modification to it. "
-            "Cannot be undone automatically."
+            self.tr("diagtrack_tooltip")
         )
 
         # Telemetry checkbox
-        self.telemetry_check = wx.CheckBox(self, label="Telemetry")
+        self.telemetry_check = wx.CheckBox(self, label=self.tr("telemetry_label"))
         self.telemetry_check.SetToolTip(
-            "Sets 'AllowTelemetry' to 0. "
-            "On non-Enterprise OS editions, requires HOSTS file modification."
+            self.tr("telemetry_tooltip")
         )
 
         # HOSTS file checkbox
-        self.host_check = wx.CheckBox(self, label="Block tracking domains")
+        self.host_check = wx.CheckBox(self, label=self.tr("host_label"))
         self.host_check.SetToolTip(
-            "Adds known tracking domains to HOSTS file. Required to disable Telemetry"
+            self.tr("host_tooltip")
         )
 
         # Extra HOSTS checkbox
-        self.extra_host_check = wx.CheckBox(
-            self, label="Block even more tracking domains"
-        )
-        self.extra_host_check.SetToolTip(
-            "For the paranoid. Adds extra domains to the HOSTS file.\n"
-            "May cause issues with Skype, Dr. Watson, Hotmail and/or Error Reporting."
-        )
+        self.extra_host_check = wx.CheckBox(self, label=self.tr("extra_host_label"))
+        self.extra_host_check.SetToolTip(self.tr("extra_host_tooltip"))
 
         # IP block checkbox
-        self.ip_check = wx.CheckBox(self, label="Block tracking IP addresses")
-        self.ip_check.SetToolTip(
-            "Blocks known tracking IP addresses with Windows Firewall."
-        )
+        self.ip_check = wx.CheckBox(self, label=self.tr("ip_label"))
+        self.ip_check.SetToolTip(self.tr("ip_tooltip"))
 
         # Windows Privacy Regs (Policy Manager)
-        self.defender_check = wx.CheckBox(self, label="Windows Defender collection")
+        self.defender_check = wx.CheckBox(self, label=self.tr("defender_label"))
         # self.defender_check.SetToolTip("Modifies registry to prevent Defender collection")
         # Disable defender option until a solution is found.
-        self.defender_check.SetToolTip(
-            "Disable due to limitation set by windows kernel."
-        )
+        self.defender_check.SetToolTip(self.tr("defender_tooltip"))
         self.defender_check.Enable(False)
 
         # WifiSense checkbox
-        self.wifisense_check = wx.CheckBox(self, label="WifiSense")
+        self.wifisense_check = wx.CheckBox(self, label=self.tr("wifisense_label"))
 
         # OneDrive uninstall checkbox
-        self.onedrive_check = wx.CheckBox(self, label="Uninstall OneDrive")
-        self.onedrive_check.SetToolTip(
-            "Uninstalls OneDrive from your computer and removes it from Explorer."
-        )
+        self.onedrive_check = wx.CheckBox(self, label=self.tr("onedrive_label"))
+        self.onedrive_check.SetToolTip(self.tr("onedrive_tooltip"))
 
         # Xbox DVR checkbox
-        self.dvr_check = wx.CheckBox(self, label="Disable Xbox DVR")
-        self.dvr_check.SetToolTip("Disable Xbox DVR feature to increase FPS in games")
+        self.dvr_check = wx.CheckBox(self, label=self.tr("dvr_label"))
+        self.dvr_check.SetToolTip(self.tr("dvr_tooltip"))
 
         self.service_rad = wx.RadioBox(
-            self, label="Service Method", choices=("Disable", "Delete")
+            self,
+            label=self.tr("service_method_label"),
+            choices=(self.tr("service_disable"), self.tr("service_delete")),
         )
         self.service_rad.SetItemToolTip(
-            item=0, text="Simply disables the services. This can be undone."
+            item=0, text=self.tr("service_disable_tooltip")
         )
         self.service_rad.SetItemToolTip(
-            item=1, text="Deletes the services completely. This can't be undone."
+            item=1, text=self.tr("service_delete_tooltip")
         )
 
-        self.mode_rad = wx.RadioBox(self, label="Mode", choices=("Privacy", "Revert"))
-        self.mode_rad.SetItemToolTip(item=0, text="Applies the selected settings.")
-        self.mode_rad.SetItemToolTip(item=1, text="Reverts the selected settings.")
+        self.mode_rad = wx.RadioBox(
+            self,
+            label=self.tr("mode_label"),
+            choices=(self.tr("mode_privacy"), self.tr("mode_revert")),
+        )
+        self.mode_rad.SetItemToolTip(item=0, text=self.tr("mode_privacy_tooltip"))
+        self.mode_rad.SetItemToolTip(item=1, text=self.tr("mode_revert_tooltip"))
 
-        go_button = wx.Button(self, label="Go!")
+        go_button = wx.Button(self, label=self.tr("go_button"))
 
         # Temporarily removed due to issues with not being able to restore apps properly
         # This was honestly beyond the scope of the project to begin with and shouldn't have been implemented
@@ -313,9 +369,8 @@ class MainPanel(wx.Panel):
         if event.IsChecked():
             warn = wx.MessageDialog(
                 parent=self,
-                message="This option could potentially disable Microsoft Licensing traffic and thus "
-                "certain games and apps may cease to work, such as, Forza, or Gears of War.",
-                caption="Attention!",
+                message=self.tr("ip_warning"),
+                caption=self.tr("attention"),
                 style=wx.YES_NO | wx.ICON_EXCLAMATION,
             )
 
@@ -329,9 +384,8 @@ class MainPanel(wx.Panel):
         if event.IsChecked():
             warn = wx.MessageDialog(
                 parent=self,
-                message="This option could potentially disable one or more of the following "
-                "services:\n\nSkype, Hotmail, Dr. Watson and/or Error Reporting. Continue?",
-                caption="Attention!",
+                message=self.tr("extra_hosts_warning"),
+                caption=self.tr("attention"),
                 style=wx.YES_NO | wx.ICON_EXCLAMATION,
             )
 
@@ -372,15 +426,8 @@ class MainPanel(wx.Panel):
             dwt_util.onedrive(undo=undo)
         if self.dvr_check.IsChecked():
             dwt_util.dvr(undo=undo)
-        logger.info(
-            "Done. It's recommended that you reboot as soon as possible for the full effect."
-        )
-        logger.info(
-            (
-                "If you feel something didn't work properly, please press the 'Report an issue'"
-                " button and follow the directions"
-            )
-        )
+        logger.info(self.tr("done_reboot"))
+        logger.info(self.tr("done_report"))
         console.Center()
         console.Show()
 
@@ -398,13 +445,30 @@ class MainPanel(wx.Panel):
         dwt_util.app_manager(app_list, undo=False)
 
     def settings(self, event, silent=False):
-        if silent == False:
+        language_codes = []
+        language_choice = None
+
+        if not silent:
             dialog = wx.Dialog(
                 parent=self,
-                title="Settings",
+                title=self.tr("settings_title"),
                 style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
             )
             sizer = wx.BoxSizer(wx.VERTICAL)
+            language_row = wx.BoxSizer(wx.HORIZONTAL)
+            language_codes = [code for code, _ in dwt_i18n.get_language_choices()]
+            language_labels = [label for _, label in dwt_i18n.get_language_choices()]
+            language_label = wx.StaticText(dialog, label=self.tr("language_label"))
+            language_choice = wx.Choice(dialog, choices=language_labels)
+            try:
+                language_choice.SetSelection(language_codes.index(self.current_language))
+            except ValueError:
+                language_choice.SetSelection(0)
+            language_row.Add(language_label, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+            language_row.Add(language_choice, 1, wx.ALL | wx.EXPAND, 5)
+            sizer.Add(language_row, 0, wx.EXPAND)
+        else:
+            dialog = self
 
         normal_domains = (
             "a-0001.a-msedge.net",
@@ -538,7 +602,7 @@ class MainPanel(wx.Panel):
         normal_domain_picker = ItemsPicker(
             dialog,
             choices=[],
-            selectedLabel="Domains to be blocked",
+            selectedLabel=self.tr("domain_picker"),
             ipStyle=IP_SORT_SELECTED | IP_SORT_CHOICES | IP_REMOVE_FROM_CHOICES,
         )
         if self.picked_normal:
@@ -556,7 +620,7 @@ class MainPanel(wx.Panel):
         extra_domain_picker = ItemsPicker(
             dialog,
             choices=[],
-            selectedLabel="Extra domains to be blocked",
+            selectedLabel=self.tr("extra_domain_picker"),
             ipStyle=IP_SORT_SELECTED | IP_SORT_CHOICES | IP_REMOVE_FROM_CHOICES,
         )
         if self.picked_extra:
@@ -570,7 +634,7 @@ class MainPanel(wx.Panel):
         ip_picker = ItemsPicker(
             dialog,
             choices=[],
-            selectedLabel="IP addresses to be blocked",
+            selectedLabel=self.tr("ip_picker"),
             ipStyle=IP_SORT_SELECTED | IP_SORT_CHOICES | IP_REMOVE_FROM_CHOICES,
         )
         if self.picked_ips:
@@ -579,14 +643,41 @@ class MainPanel(wx.Panel):
         else:
             ip_picker.SetSelections(ip_addresses)
 
-        if silent == False:
+        if not silent:
             sizer.Add(normal_domain_picker, 0, wx.EXPAND)
             sizer.Add(extra_domain_picker, 0, wx.EXPAND)
             sizer.Add(ip_picker, 0, wx.EXPAND)
+
+            button_sizer = dialog.CreateSeparatedButtonSizer(wx.OK | wx.CANCEL)
+            if button_sizer:
+                sizer.Add(button_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+            dialog.SetSizerAndFit(sizer)
+
             if event is not None:
-                dialog.SetSizerAndFit(sizer)
                 dialog.Center()
-                dialog.ShowModal()
+                if dialog.ShowModal() == wx.ID_CANCEL:
+                    dialog.Destroy()
+                    return
+
+            selected_language = language_codes[language_choice.GetSelection()]
+            if selected_language != self.current_language:
+                global APP_SETTINGS
+                self.current_language = selected_language
+                dwt_i18n.set_language(self.current_language)
+                APP_SETTINGS["language"] = self.current_language
+                save_app_settings(APP_SETTINGS)
+
+                if event is not None:
+                    info = wx.MessageDialog(
+                        parent=self,
+                        message=self.tr("language_changed"),
+                        caption=self.tr("settings_title"),
+                        style=wx.OK | wx.ICON_INFORMATION,
+                    )
+                    info.ShowModal()
+                    info.Destroy()
+
             dialog.Destroy()
 
         self.picked_normal = normal_domain_picker.GetSelections()
@@ -616,8 +707,8 @@ def setup_logging():
     except (OSError, IOError):
         error_dialog = wx.MessageDialog(
             parent=wx.GetApp().GetTopWindow(),
-            message="Could not create log file, errors will not be recorded!",
-            caption="ERROR!",
+            message=dwt_i18n.translate("log_file_error"),
+            caption=dwt_i18n.translate("error_title"),
             style=wx.OK | wx.ICON_ERROR,
         )
         error_dialog.ShowModal()
@@ -638,11 +729,13 @@ def exception_hook(error, value, trace):
     logger.critical(error_message)
     error_dialog = wx.MessageDialog(
         parent=wx.GetApp().GetTopWindow(),
-        message="An error has occured!\n\n" + error_message,
-        caption="ERROR!",
+        message=dwt_i18n.translate("exception_msg", error=error_message),
+        caption=dwt_i18n.translate("error_title"),
         style=wx.OK | wx.CANCEL | wx.ICON_ERROR,
     )
-    error_dialog.SetOKCancelLabels("Ignore", "Quit")
+    error_dialog.SetOKCancelLabels(
+        dwt_i18n.translate("exception_ignore"), dwt_i18n.translate("exception_quit")
+    )
     if error_dialog.ShowModal() == wx.ID_OK:
         error_dialog.Destroy()
     else:
@@ -687,6 +780,9 @@ def silent():
 
 
 if __name__ == "__main__":
+    APP_SETTINGS = load_app_settings()
+    dwt_i18n.set_language(APP_SETTINGS.get("language"))
+
     if "-silent" in sys.argv:
         silent()
         sys.exit(0)

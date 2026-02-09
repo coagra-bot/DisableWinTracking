@@ -26,11 +26,14 @@ import wx
 import wx.adv
 import wx.lib.scrolledpanel as sp
 
+import dwt_i18n
+
 __version__ = "3.2.6"
 year = datetime.date.today().year
 
 
 def about_dialog(parent):
+    tr = dwt_i18n.translate
     license_text = """
     Copyright (C) 10se1ucgo 2015-{year}
 
@@ -50,12 +53,12 @@ def about_dialog(parent):
     )
 
     about_info = wx.adv.AboutDialogInfo()
-    about_info.SetName("Disable Windows 10 Tracking")
+    about_info.SetName(tr("about_name"))
     about_info.SetVersion("v{v}".format(v=__version__))
     about_info.SetCopyright("Copyright (C) 10se1ucgo 2015-{year}".format(year=year))
-    about_info.SetDescription("A tool to disable tracking in Windows 10")
+    about_info.SetDescription(tr("about_description"))
     about_info.SetWebSite(
-        "https://github.com/Potencial/DisableWinTracking", "GitHub repository"
+        "https://github.com/Potencial/DisableWinTracking", tr("about_website")
     )
     about_info.AddDeveloper("10se1ucgo")
     about_info.AddDeveloper("Ruined1")
@@ -65,8 +68,9 @@ def about_dialog(parent):
 
 class Licenses(wx.Dialog):
     def __init__(self, parent):
+        tr = dwt_i18n.translate
         super(Licenses, self).__init__(
-            parent, title="Licenses", style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+            parent, title=tr("licenses_title"), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
         )
 
         self.scrolled_panel = sp.ScrolledPanel(self)
@@ -76,18 +80,12 @@ class Licenses(wx.Dialog):
 
         info = wx.StaticText(
             self.scrolled_panel,
-            label=(
-                "DisableWinTracking uses a number of open source software."
-                "The following are the licenses for these software."
-            ),
+            label=tr("licenses_intro"),
         )
 
         wxw = wx.StaticText(
             self.scrolled_panel,
-            label=(
-                "DisableWinTracking uses wxWidgets and wxPython. Their license "
-                "is below\nMore info at https://www.wxwidgets.org/about/"
-            ),
+            label=tr("licenses_wx"),
         )
         wxw_license = """
                   wxWindows Library License, Version 3.1
@@ -134,7 +132,7 @@ class Licenses(wx.Dialog):
 
         pywin = wx.StaticText(
             self.scrolled_panel,
-            label="DisableWinTracking uses PyWin32. Its license is below.",
+            label=tr("licenses_pywin"),
         )
         pywin_license = """
     Unless stated in the specific source file, this work is
@@ -187,6 +185,7 @@ class Licenses(wx.Dialog):
 
 
 def update_check(parent):
+    tr = dwt_i18n.translate
     try:
         r = urlopen(
             "https://api.github.com/repos/Potencial/DisableWinTracking/releases/latest"
@@ -202,8 +201,8 @@ def update_check(parent):
         if Version(__version__) < Version(new.lstrip("v")):
             info = wx.MessageDialog(
                 parent,
-                message="DWT {v} is now available!\nGo to download page?".format(v=new),
-                caption="DWT Update",
+                message=tr("update_message", version=new),
+                caption=tr("update_title"),
                 style=wx.OK | wx.CANCEL | wx.ICON_INFORMATION,
             )
             if info.ShowModal() == wx.ID_OK:
