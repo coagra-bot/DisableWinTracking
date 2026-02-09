@@ -28,7 +28,7 @@ import wx.lib.scrolledpanel as sp
 
 import dwt_i18n
 
-__version__ = "3.2.6"
+__version__ = "3.3.0"
 year = datetime.date.today().year
 
 
