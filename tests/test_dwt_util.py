@@ -66,6 +66,62 @@ class ProcessAndDiagtrackTests(unittest.TestCase):
         self.assertIn("sc delete dmwappushsvc", commands)
 
 
+class PrivacyPlusPolicyTests(unittest.TestCase):
+    @patch("dwt_util.set_registry")
+    def test_advertising_id_values(self, set_registry):
+        dwt_util.advertising_id(undo=False)
+        self.assertEqual(set_registry.call_args.args[0]["Advertising ID"][4], 1)
+
+        dwt_util.advertising_id(undo=True)
+        self.assertEqual(set_registry.call_args.args[0]["Advertising ID"][4], 0)
+
+    @patch("dwt_util.set_registry")
+    def test_activity_history_values(self, set_registry):
+        dwt_util.activity_history(undo=False)
+        registry_keys = set_registry.call_args.args[0]
+        self.assertEqual(registry_keys["EnableActivityFeed"][4], 0)
+        self.assertEqual(registry_keys["PublishUserActivities"][4], 0)
+        self.assertEqual(registry_keys["UploadUserActivities"][4], 0)
+
+        dwt_util.activity_history(undo=True)
+        registry_keys = set_registry.call_args.args[0]
+        self.assertEqual(registry_keys["EnableActivityFeed"][4], 1)
+        self.assertEqual(registry_keys["PublishUserActivities"][4], 1)
+        self.assertEqual(registry_keys["UploadUserActivities"][4], 1)
+
+    @patch("dwt_util.set_registry")
+    def test_cross_device_clipboard_values(self, set_registry):
+        dwt_util.cross_device_clipboard(undo=False)
+        self.assertEqual(set_registry.call_args.args[0]["AllowCrossDeviceClipboard"][4], 0)
+
+        dwt_util.cross_device_clipboard(undo=True)
+        self.assertEqual(set_registry.call_args.args[0]["AllowCrossDeviceClipboard"][4], 1)
+
+    @patch("dwt_util.set_registry")
+    def test_input_personalization_values(self, set_registry):
+        dwt_util.input_personalization(undo=False)
+        self.assertEqual(set_registry.call_args.args[0]["AllowInputPersonalization"][4], 0)
+
+        dwt_util.input_personalization(undo=True)
+        self.assertEqual(set_registry.call_args.args[0]["AllowInputPersonalization"][4], 1)
+
+    @patch("dwt_util.set_registry")
+    def test_tailored_experiences_values(self, set_registry):
+        dwt_util.tailored_experiences(undo=False)
+        self.assertEqual(set_registry.call_args.args[0]["TailoredExperiences"][4], 1)
+
+        dwt_util.tailored_experiences(undo=True)
+        self.assertEqual(set_registry.call_args.args[0]["TailoredExperiences"][4], 0)
+
+    @patch("dwt_util.set_registry")
+    def test_feedback_notifications_values(self, set_registry):
+        dwt_util.feedback_notifications(undo=False)
+        self.assertEqual(set_registry.call_args.args[0]["FeedbackNotifications"][4], 1)
+
+        dwt_util.feedback_notifications(undo=True)
+        self.assertEqual(set_registry.call_args.args[0]["FeedbackNotifications"][4], 0)
+
+
 class HostsFileTests(unittest.TestCase):
     def _run_host_file(self, hosts_content, entries, undo):
         with tempfile.TemporaryDirectory() as temp_dir:

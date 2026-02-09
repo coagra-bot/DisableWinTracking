@@ -278,7 +278,7 @@ def telemetry(undo):
             value,
         ]
     }
-    set_registry(telemetry_keys)
+    return set_registry(telemetry_keys)
 
 
 def services(undo):
@@ -299,7 +299,7 @@ def services(undo):
             value,
         ],
     }
-    set_registry(service_keys)
+    return set_registry(service_keys)
 
 
 def defender(undo):
@@ -327,7 +327,7 @@ def defender(undo):
             value,
         ],
     }
-    set_registry(defender_keys)
+    return set_registry(defender_keys)
 
 
 def wifisense(undo):
@@ -348,7 +348,7 @@ def wifisense(undo):
             value,
         ],
     }
-    set_registry(wifisense_keys)
+    return set_registry(wifisense_keys)
 
 
 def onedrive(undo):
@@ -398,7 +398,7 @@ def onedrive(undo):
             ],
         }
 
-    set_registry(onedrive_keys)
+    registry_ok = set_registry(onedrive_keys)
 
     system = "SysWOW64" if is_64bit() else "System32"
     onedrive_setup = os.path.join(
@@ -413,6 +413,7 @@ def onedrive(undo):
         return_code, stdout, stderr = subprocess_handler(cmd)
         if return_code in (0, -2147219813):
             logger.info("OneDrive: successfully {action}ed".format(action=action))
+            return registry_ok
         else:
             output = _decode_output(stderr) or _decode_output(stdout)
             logger.info(
@@ -420,12 +421,14 @@ def onedrive(undo):
                     action=action, code=return_code, message=output
                 )
             )
+            return False
     else:
         logger.info(
             "OneDrive: Binary doesn't exist. Unable to {action}. Do not send a report for this.".format(
                 action=action
             )
         )
+        return registry_ok
 
 
 def set_registry(keys):
@@ -434,6 +437,7 @@ def set_registry(keys):
         if is_64bit()
         else winreg.KEY_ALL_ACCESS
     )
+    success = True
 
     for key_name, values in keys.items():
         try:
@@ -444,9 +448,11 @@ def set_registry(keys):
                 "Registry: Successfully modified {key} key.".format(key=key_name)
             )
         except OSError:
+            success = False
             logger.exception(
                 "Registry: Unable to modify {key} key.".format(key=key_name)
             )
+    return success
 
 
 def host_file(entries, undo):
@@ -592,5 +598,104 @@ def dvr(undo):
         ],
     }
 
-    set_registry(dvr_keys)
+    success = set_registry(dvr_keys)
     logger.info("Xbox DVR: successfully {action}".format(action=action))
+    return success
+
+
+def advertising_id(undo):
+    value = 0 if undo else 1
+    advertising_keys = {
+        "Advertising ID": [
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo",
+            "DisabledByGroupPolicy",
+            winreg.REG_DWORD,
+            value,
+        ]
+    }
+    return set_registry(advertising_keys)
+
+
+def activity_history(undo):
+    value = 1 if undo else 0
+    activity_history_keys = {
+        "EnableActivityFeed": [
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "EnableActivityFeed",
+            winreg.REG_DWORD,
+            value,
+        ],
+        "PublishUserActivities": [
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "PublishUserActivities",
+            winreg.REG_DWORD,
+            value,
+        ],
+        "UploadUserActivities": [
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "UploadUserActivities",
+            winreg.REG_DWORD,
+            value,
+        ],
+    }
+    return set_registry(activity_history_keys)
+
+
+def cross_device_clipboard(undo):
+    value = 1 if undo else 0
+    clipboard_keys = {
+        "AllowCrossDeviceClipboard": [
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "AllowCrossDeviceClipboard",
+            winreg.REG_DWORD,
+            value,
+        ]
+    }
+    return set_registry(clipboard_keys)
+
+
+def input_personalization(undo):
+    value = 1 if undo else 0
+    input_keys = {
+        "AllowInputPersonalization": [
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Policies\Microsoft\InputPersonalization",
+            "AllowInputPersonalization",
+            winreg.REG_DWORD,
+            value,
+        ]
+    }
+    return set_registry(input_keys)
+
+
+def tailored_experiences(undo):
+    value = 0 if undo else 1
+    experience_keys = {
+        "TailoredExperiences": [
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Policies\Microsoft\Windows\CloudContent",
+            "DisableTailoredExperiencesWithDiagnosticData",
+            winreg.REG_DWORD,
+            value,
+        ]
+    }
+    return set_registry(experience_keys)
+
+
+def feedback_notifications(undo):
+    value = 0 if undo else 1
+    feedback_keys = {
+        "FeedbackNotifications": [
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Policies\Microsoft\Assistance\Client\1.0",
+            "NoExplicitFeedback",
+            winreg.REG_DWORD,
+            value,
+        ]
+    }
+    return set_registry(feedback_keys)
